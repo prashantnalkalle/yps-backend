@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: yps-backend
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: FRONTEND_URL
+        sync: false
+      - key: DATA_DIR
+        value: /var/data/yps
+    disk:
+      name: yps-admissions
+      mountPath: /var/data
+      sizeGB: 1

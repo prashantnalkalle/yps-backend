@@ -1,0 +1,18 @@
+{
+    "name":  "yps-backend",
+    "version":  "1.0.0",
+    "private":  true,
+    "description":  "Student admissions, file uploads and fee receipt API",
+    "main":  "index.cjs",
+    "scripts":  {
+                    "start":  "node index.cjs",
+                    "test":  "node smoke-test.cjs \u0026\u0026 node deployment-test.cjs"
+                },
+    "engines":  {
+                    "node":  "\u003e=16"
+                },
+    "dependencies":  {
+                         "express":  "^4.22.3",
+                         "multer":  "^2.4.0"
+                     }
+}
