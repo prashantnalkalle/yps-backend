@@ -1,9 +1,10 @@
+require('dotenv').config({ quiet: true });
 const express = require('express');
 const multer = require('multer');
-const fs = require('fs/promises');
-const path = require('path');
+const { createStorage } = require('./storage.cjs');
 const { randomUUID } = require('crypto');
 const app = express();
+const storage = createStorage();
 app.disable('x-powered-by');
 const defaultOrigins = [
   'https://reactiveform1-seven.vercel.app',
@@ -35,11 +36,14 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
-app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'yps-backend' }));
-const dataDirectory = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data');
-if (process.env.RENDER && !process.env.DATA_DIR) {
-  throw new Error('Set DATA_DIR to a persistent disk mount path before deploying.');
-}
+app.get('/api/health', async (req, res) => {
+  try {
+    await storage.health();
+    res.json({ status: 'ok', service: 'yps-backend' });
+  } catch {
+    res.status(503).json({ status: 'unavailable', service: 'yps-backend' });
+  }
+});
 const rates = { Mathematics: 2500, Science: 2500, English: 1800, 'Social Science': 1800, Physics: 3000, Chemistry: 3000, Biology: 3000 };
 const methods = ['PhonePe', 'Google Pay', 'Paytm', 'BHIM', 'Amazon Pay', 'WhatsApp Pay', 'Other UPI app', 'Debit card', 'Credit card', 'Net banking', 'NEFT', 'RTGS', 'IMPS'];
 const upload = multer({
@@ -62,7 +66,6 @@ function validSignature(file) {
 app.post('/api/admissions', (req, res) => {
   upload(req, res, async error => {
     if (error) return res.status(400).json({ error: error.message });
-    let directory;
     try {
       const student = JSON.parse(req.body.student);
       const upper = ['Class 11', 'Class 12'].includes(student.class);
@@ -93,13 +96,10 @@ app.post('/api/admissions', (req, res) => {
       const files = Object.values(req.files || {}).flat();
       if (files.some(file => !validSignature(file))) return res.status(400).json({ error: 'File content does not match its type' });
       const id = randomUUID();
-      directory = path.join(dataDirectory, id);
-      await fs.mkdir(directory, { recursive: true });
       const attachments = {};
       const extensions = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'application/pdf': '.pdf' };
       for (const file of files) {
         const filename = file.fieldname + extensions[file.mimetype];
-        await fs.writeFile(path.join(directory, filename), file.buffer);
         attachments[file.fieldname] = filename;
       }
       const createdAt = new Date().toISOString();
@@ -115,11 +115,9 @@ app.post('/api/admissions', (req, res) => {
         paymentMethod: student.amount > 0 ? student.paymentMethod : null,
         remarks: student.remarks
       };
-      await fs.writeFile(path.join(directory, 'receipt.json'), JSON.stringify(receipt, null, 2));
-      await fs.writeFile(path.join(directory, 'admission.json'), JSON.stringify({ id, student, total: receipt.total, pending: receipt.pending, attachments, createdAt }, null, 2));
+      await storage.save({ id, student, total: receipt.total, pending: receipt.pending, attachments, createdAt }, receipt, files);
       res.status(201).json({ id, receipt });
     } catch (error) {
-      if (directory) await fs.rm(directory, { recursive: true, force: true });
       res.status(error instanceof SyntaxError ? 400 : 500).json({ error: 'Unable to save admission' });
     }
   });
@@ -127,6 +125,17 @@ app.post('/api/admissions', (req, res) => {
 if (require.main === module) {
   const port = Number(process.env.PORT) || 3000;
   const host = process.env.HOST || (process.env.RENDER || process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
-  app.listen(port, host, () => console.log('YPS admission API listening on ' + host + ':' + port));
+  storage.init().then(() => {
+    const server = app.listen(port, host, () => console.log('YPS admission API listening on ' + host + ':' + port));
+    for (const signal of ['SIGTERM', 'SIGINT']) {
+      process.once(signal, () => server.close(() => {
+        storage.close().then(() => process.exit(0), () => process.exit(1));
+      }));
+    }
+  }).catch(async () => {
+    console.error('Unable to initialize storage. Check MongoDB credentials and Atlas network access.');
+    await storage.close().catch(() => {});
+    process.exitCode = 1;
+  });
 }
 module.exports = app;
