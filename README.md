@@ -25,7 +25,7 @@ Environment settings:
 
 Mount a persistent disk at /var/data. Render supplies PORT; the server binds to it. Without durable storage, Render discards locally written admissions and uploads on restarts and deploys. Do not set DATA_DIR to an ephemeral folder for production.
 
-FRONTEND_URL can contain a comma-separated list of exact allowed origins. Add explicitly approved preview origins if needed. It controls browser CORS, not authentication.
+The backend allows https://reactiveform1-seven.vercel.app and http://localhost:4200 by default. FRONTEND_URL can contain a comma-separated list of additional exact allowed origins; trailing slashes are normalized. Paths, queries and credentials are rejected. Add explicitly approved preview origins if needed. It controls browser CORS, not authentication.
 
 Local .env.example documents settings; .env files are not loaded automatically. Set variables through the host dashboard or terminal environment.
 

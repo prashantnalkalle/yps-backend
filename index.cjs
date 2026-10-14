@@ -5,12 +5,29 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 const app = express();
 app.disable('x-powered-by');
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:4200').split(',').map(origin => origin.trim()).filter(Boolean);
+const defaultOrigins = [
+  'https://reactiveform1-seven.vercel.app',
+  'http://localhost:4200'
+];
+const configuredOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+const allowedOrigins = new Set(
+  [...defaultOrigins, ...configuredOrigins].map(origin => {
+    const url = new URL(origin);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+        url.pathname !== '/' || url.search || url.hash) {
+      throw new Error('FRONTEND_URL must contain comma-separated HTTP or HTTPS origins without paths.');
+    }
+    return url.origin;
+  })
+);
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
     res.vary('Origin');
-    if (!allowedOrigins.includes(origin)) return res.status(403).json({ error: 'This frontend origin is not allowed' });
+    if (!allowedOrigins.has(origin)) return res.status(403).json({ error: 'This frontend origin is not allowed' });
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
