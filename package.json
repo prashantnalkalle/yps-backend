@@ -6,7 +6,7 @@
     "main": "index.cjs",
     "scripts": {
         "start": "node index.cjs",
-        "test": "node smoke-test.cjs && node deployment-test.cjs && node storage-test.cjs"
+        "test": "node test-runner.cjs"
     },
     "engines": {
         "node": ">=20"

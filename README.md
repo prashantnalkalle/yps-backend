@@ -5,6 +5,26 @@ Independent Express/Multer backend. This folder belongs beside reactiveform1, no
 Local startup: npm ci followed by npm start. The default API address is http://localhost:3000.
 Tests: npm test.
 
+Use Node 20 or later for this backend. With nvm-windows, run `nvm use 20.20.2` (installed locally) before `npm start` or `npm test`. The Angular frontend may continue using its own supported Node version in a separate terminal.
+
+## Vercel backend
+
+Deploy this repository as the backend project, using the Express framework configured in vercel.json. The exported index.cjs app handles requests without starting a separate listener on Vercel, following https://vercel.com/docs/frameworks/backend/express.
+
+In the **backend** project's Settings > Environment Variables, set these for Production (and Preview when testing preview deployments):
+
+- MONGODB_URI: the same private Atlas connection string that works in your local .env. A local .env is not uploaded or automatically copied into Vercel.
+- MONGODB_DB: yps
+- FRONTEND_URL: https://reactiveform1-seven.vercel.app
+
+Select a supported Node version of at least 20 in project settings and redeploy after saving environment variables. Ensure Atlas Network Access allows connections from the deployment. Never commit .env or paste the connection string into frontend settings.
+
+Open https://yps-backend.vercel.app/api/health after deployment; success is HTTP 200 with status "ok". Missing/invalid MongoDB settings or unavailable storage now return HTTP 503 with CORS headers, rather than crashing during handler import. Check Vercel runtime logs for storage initialization errors if health remains unavailable.
+
+The frontend already targets https://yps-backend.vercel.app/api, so it needs no URL change when that backend is redeployed. If you change the backend domain, update BACKEND_URL on the frontend project and rebuild it.
+
+Storage initializes on the first request and is reused within each running function instance. Vercel never falls back to local JSON storage. Tests run with an isolated temporary data directory and do not load .env or use Atlas.
+
 Endpoints:
 - GET /api/health
 - POST /api/admissions (multipart fields: student JSON, optional photo, optional receipt)

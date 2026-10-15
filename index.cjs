@@ -1,10 +1,26 @@
-require('dotenv').config({ quiet: true });
+if (process.env.NODE_ENV !== 'test') require('dotenv').config({ quiet: true });
 const express = require('express');
 const multer = require('multer');
 const { createStorage } = require('./storage.cjs');
 const { randomUUID } = require('crypto');
 const app = express();
-const storage = createStorage();
+let storage;
+let storageReady;
+async function readyStorage() {
+  if (!storageReady) {
+    storageReady = Promise.resolve().then(async () => {
+      storage ||= createStorage();
+      await storage.init();
+      return storage;
+    }).catch(error => {
+      storageReady = undefined;
+      // Do not log connection strings or credentials.
+      console.error('Storage initialization failed. Check MONGODB_URI and Atlas network access.', error.name);
+      throw error;
+    });
+  }
+  return storageReady;
+}
 app.disable('x-powered-by');
 const defaultOrigins = [
   'https://reactiveform1-seven.vercel.app',
@@ -38,7 +54,7 @@ app.use((req, res, next) => {
 });
 app.get('/api/health', async (req, res) => {
   try {
-    await storage.health();
+    await (await readyStorage()).health();
     res.json({ status: 'ok', service: 'yps-backend' });
   } catch {
     res.status(503).json({ status: 'unavailable', service: 'yps-backend' });
@@ -115,17 +131,22 @@ app.post('/api/admissions', (req, res) => {
         paymentMethod: student.amount > 0 ? student.paymentMethod : null,
         remarks: student.remarks
       };
-      await storage.save({ id, student, total: receipt.total, pending: receipt.pending, attachments, createdAt }, receipt, files);
+      try {
+        const store = await readyStorage();
+        await store.save({ id, student, total: receipt.total, pending: receipt.pending, attachments, createdAt }, receipt, files);
+      } catch {
+        return res.status(503).json({ error: 'Admission storage is unavailable. Please try again later.' });
+      }
       res.status(201).json({ id, receipt });
     } catch (error) {
       res.status(error instanceof SyntaxError ? 400 : 500).json({ error: 'Unable to save admission' });
     }
   });
 });
-if (require.main === module) {
+if (require.main === module && !process.env.VERCEL) {
   const port = Number(process.env.PORT) || 3000;
   const host = process.env.HOST || (process.env.RENDER || process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
-  storage.init().then(() => {
+  readyStorage().then(() => {
     const server = app.listen(port, host, () => console.log('YPS admission API listening on ' + host + ':' + port));
     for (const signal of ['SIGTERM', 'SIGINT']) {
       process.once(signal, () => server.close(() => {
@@ -134,7 +155,7 @@ if (require.main === module) {
     }
   }).catch(async () => {
     console.error('Unable to initialize storage. Check MongoDB credentials and Atlas network access.');
-    await storage.close().catch(() => {});
+    await storage?.close().catch(() => {});
     process.exitCode = 1;
   });
 }

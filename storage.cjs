@@ -26,7 +26,7 @@ function createStorage(env = process.env) {
     const store = createMongoStore(client.db(env.MONGODB_DB || 'yps'));
     return { ...store, async init() { await client.connect(); await store.health(); }, close: () => client.close() };
   }
-  if (env.RENDER || env.NODE_ENV === 'production') {
+  if (env.VERCEL || env.RENDER || env.NODE_ENV === 'production') {
     throw new Error('Set MONGODB_URI before starting the production backend.');
   }
   const root = env.DATA_DIR ? path.resolve(env.DATA_DIR) : path.join(__dirname, 'data');

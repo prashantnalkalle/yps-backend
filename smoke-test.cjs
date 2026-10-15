@@ -25,7 +25,7 @@ const server = app.listen(0, '127.0.0.1', async () => {
     const result = await send({...student, paymentMode: 'online', paymentMethod: 'PhonePe'}, '%PDF-1.4\n test fixture');
     assert.equal(result.status, 201);
     assert.match(result.body.id, /^[0-9a-f-]{36}$/);
-    savedDirectory = path.join(__dirname, 'data', result.body.id);
+    savedDirectory = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), result.body.id);
     const record = JSON.parse(await fs.readFile(path.join(savedDirectory, 'admission.json')));
     assert.equal(record.total, 2400);
     assert.equal(record.pending, 1900);

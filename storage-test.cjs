@@ -4,6 +4,8 @@ const { createStorage, createMongoStore } = require('./storage.cjs');
 async function run() {
   assert.throws(() => createStorage({ NODE_ENV: 'production' }), /MONGODB_URI/);
   assert.throws(() => createStorage({ RENDER: 'true', DATA_DIR: '/tmp' }), /MONGODB_URI/);
+  assert.throws(() => createStorage({ VERCEL: '1' }), /MONGODB_URI/);
+  assert.throws(() => createStorage({ VERCEL: '1' }), /MONGODB_URI/);
   const record = { id: 'test-id', attachments: { receipt: 'receipt.pdf' }, total: 2400, pending: 1900 };
   const receipt = { number: record.id, paid: 500 };
   const files = [{ fieldname: 'receipt', mimetype: 'application/pdf', buffer: Buffer.from('%PDF-1.4 fixture') }];
